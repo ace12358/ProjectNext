@@ -1,3 +1,5 @@
+####ProjectNext Web応用に関するプログラム
+
 Help on module ModelMaker:
 
 NAME
@@ -15,6 +17,7 @@ DESCRIPTION
     "flag", "data", "tweet"
 
 FUNCTIONS
+
     FeatureMention(tweet)
         Mention（@がついているか）なのかそうでないかを返す関数
         入力：tweet
