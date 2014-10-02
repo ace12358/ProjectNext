@@ -6,6 +6,14 @@ NAME
 FILE
     /Users/kitagawayoshiaki/Works/ProjectNext/scripts/ModelMaker.py
 
+DESCRIPTION
+    
+    実行方法
+    python ModelMaker.py --input [csv形式のfile名] --output [output filename]
+    
+    csv の形式(field)
+    "flag", "data", "tweet"
+
 FUNCTIONS
     FeatureMention(tweet)
         @ での返信なのかそうでないかを返す関数
