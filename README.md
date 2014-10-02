@@ -16,7 +16,7 @@ DESCRIPTION
 
 FUNCTIONS
     FeatureMention(tweet)
-        @ での返信なのかそうでないかを返す関数
+        Mention（@がついているか）なのかそうでないかを返す関数
         入力：tweet
         出力：0 or 1
     
