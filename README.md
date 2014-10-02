@@ -1,4 +1,3 @@
-#### ProjectNext Web応用 に関するプログラム
 Help on module ModelMaker:
 
 NAME
@@ -6,13 +5,6 @@ NAME
 
 FILE
     /Users/kitagawayoshiaki/Works/ProjectNext/scripts/ModelMaker.py
-
-DESCRIPTION
-    実行方法
-    python ModelMaker.py --input [csv形式のfile名] --output [output filename]
-    
-    csv の形式(field)
-    "flag", "data", "tweet"
 
 FUNCTIONS
     FeatureMention(tweet)
