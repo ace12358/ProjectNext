@@ -21,6 +21,7 @@ import MeCab
 import re
 import argparse
 import csv
+import string
 
 def getArgs():
     """
@@ -118,12 +119,15 @@ def FeatureNgram(tweet, word, window=4):
         end_index = re_word_search.end(0)
         r_ngram = tweet[end_index:end_index+window]
         l_ngram = tweet[start_index-window:start_index]
+        #半角スペースを0に変換
+        l_ngram = l_ngram.translate({ord(u' '): u'0'})
+        r_ngram = r_ngram.translate({ord(u' '): u'0'})
         #どちらも文字列がwindow数の大きさになるまで"0"をつめる
         while (len(r_ngram)) != window:
             r_ngram+="0"
         while (len(l_ngram)) != window:
             l_ngram = "0" + l_ngram
-        ngram = l_ngram + " " + r_ngram
+        ngram = l_ngram + "|" + r_ngram
         return ngram
     except(AttributeError):
         #wordがないものがあるのでその場合はNoneを返す
@@ -137,6 +141,8 @@ def main():
     Reader = csv.reader(args.train_file)
     for itemList in Reader:
         flag = itemList[0] #0 or 1
+        if flag == "0":
+            flag = "-1"
         data = itemList[1] #日付
         tweet = itemList[2] #tweetの本文
         #素性の抽出
@@ -158,8 +164,8 @@ def main():
         args.model_file.write("f_window4=%s " %f_window_list[4])
         args.model_file.write("f_window5=%s " %f_window_list[5])
 
-        args.model_file.write("f_ngram_l=%s " %f_ngram.split()[0].encode("utf-8"))
-        args.model_file.write("f_ngram_r=%s\n" %f_ngram.split()[1].encode("utf-8"))
+        args.model_file.write("f_ngram_l=%s " %f_ngram.split("|")[0].encode("utf-8"))
+        args.model_file.write("f_ngram_r=%s\n" %f_ngram.split("|")[1].encode("utf-8"))
 
 if __name__=="__main__":
     args=getArgs()
