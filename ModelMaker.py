@@ -6,7 +6,7 @@ classiasにいれるmodel fileを作るプログラム
 
 
 実行方法
-python ModelMaker.py --input [csv形式のfile名] --output [output filename]
+python ModelMaker.py --input [csv形式のfile名] --output [output filename] -tsutsuji [tsutsuji_filename]
 
 csv の形式(field)
 "flag", "data", "tweet"
@@ -43,6 +43,13 @@ def getArgs():
         type=argparse.FileType("w"),
         default=sys.stdout,
         help="output filename as classias model"
+    )
+    parser.add_argument(
+        "-t", "--tsutsuji",
+        dest="tsutsuji_file",
+        type=argparse.FileType("r"),
+        default=sys.stdout,
+        help="tsutsuji filename as tsutsuji data"
     )
 
     return parser.parse_args()
@@ -133,11 +140,37 @@ def FeatureNgram(tweet, word, window=4):
         #wordがないものがあるのでその場合はNoneを返す
         return None
 
+def FeatureTsutsuji(right_window,TsutsujiDict):
+    """
+    tweet中の機能表現にマッチするもののリストを返す
+    入力:right_window, tsutsujiの辞書(key=表層, value=意味ID)
+    出力:マッチした機能表現の意味IDリスト
+    """
+    ID_list = list()
+    for i in range(len(right_window)):
+        surface = right_window[i].decode("utf-8")
+        if surface in TsutsujiDict:
+            ID_list.append(TsutsujiDict[surface])
+    #print ID_list
+    return ID_list
+
 def main():
     """
     main関数
     classiasのモデルを作れるような形式でfileを作成
     """
+
+    #つつじの辞書の読み込み
+    TsutsujiDict = dict()
+    for line in args.tsutsuji_file:
+        itemList = line.strip().split(",")
+        surface = itemList[0].decode("utf-8")
+        wordsenseID = itemList[3]
+        TsutsujiDict[surface] = wordsenseID
+
+    #for i,j in TsutsujiDict.items():
+    #    print i.encode("utf-8"), j
+
     Reader = csv.reader(args.train_file)
     for itemList in Reader:
         flag = itemList[0] #0 or 1
@@ -149,6 +182,9 @@ def main():
         f_url = FeatureUrl(tweet)
         f_mention = FeatureMention(tweet)
         f_window_list = FeatureWindow(tweet,"インフルエンザ")
+        #f_window_listの右windowをつつじで調べる
+        f_tsutsuji_list = FeatureTsutsuji(f_window_list[3:], TsutsujiDict) #右のwindow 3つ
+
         f_ngram = FeatureNgram(tweet, "インフルエンザ")
         if f_ngram == None: #インフルエンザが入っていないtweet
             continue
@@ -157,16 +193,31 @@ def main():
         args.model_file.write("url=%d " %f_url)
         args.model_file.write("mentoin=%d " %f_mention)
 
+        for i in range(len(f_ngram)/2):
+        #    print i
+            args.model_file.write("f_ngram_l=%s " %f_ngram.split("|")[0][0:0+i+1].encode("utf-8"))
+            args.model_file.write("f_ngram_r=%s " %f_ngram.split("|")[1][0:0+i+1].encode("utf-8"))
+        ####つつじの意味ID素性を作成
+        for f_tsutsuji in f_tsutsuji_list:
+            args.model_file.write("f_tsutsuji_ID=%s " %f_tsutsuji)
+        
+        ####windowをBOWで入れる
+        args.model_file.write("f_window=%s " %f_window_list[0])
+        args.model_file.write("f_window=%s " %f_window_list[1])
+        args.model_file.write("f_window=%s " %f_window_list[2])
+        args.model_file.write("f_window=%s " %f_window_list[3])
+        args.model_file.write("f_window=%s " %f_window_list[4])
+        args.model_file.write("f_window=%s " %f_window_list[5])
+
+        args.model_file.write("\n")
+        """
         args.model_file.write("f_window0=%s " %f_window_list[0])
         args.model_file.write("f_window1=%s " %f_window_list[1])
         args.model_file.write("f_window2=%s " %f_window_list[2])
         args.model_file.write("f_window3=%s " %f_window_list[3])
         args.model_file.write("f_window4=%s " %f_window_list[4])
         args.model_file.write("f_window5=%s " %f_window_list[5])
-
-        args.model_file.write("f_ngram_l=%s " %f_ngram.split("|")[0].encode("utf-8"))
-        args.model_file.write("f_ngram_r=%s\n" %f_ngram.split("|")[1].encode("utf-8"))
-
+        """
 if __name__=="__main__":
     args=getArgs()
     main()
