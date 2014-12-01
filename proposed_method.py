@@ -169,17 +169,27 @@ def FeatureNgram(tweet, word, window=4):
         #wordがないものがあるのでその場合はNoneを返す
         return None
 
-def FeatureTsutsuji(right_window, TsutsujiDict):
+def FeatureTsutsuji(tweet, word, TsutsujiDict):
     """
     tweet中の機能表現にマッチするもののリストを返す
-    入力:right_window, tsutsujiの辞書(key=表層, value=意味ID)
+    入力:tweet,着目word, tsutsujiの辞書(key=表層, value=意味ID)
     出力:マッチした機能表現の意味IDリスト
     """
     ID_list = list()
-    for i in range(len(right_window)):
-        surface = right_window[i].decode("utf-8")
-        if surface in TsutsujiDict:
-            ID_list.append(TsutsujiDict[surface])
+    tweet = tweet.decode("utf-8")
+    re_word = re.compile(word.decode("utf-8"))
+    if re_word.search(tweet) == None:
+        print "%s is not in tweet"
+        return ID_list
+    re_word_end_index = re_word.search(tweet).end()
+    tweet_right = tweet[re_word_end_index:re_word_end_index+15]
+    ####部分文字列の取得
+    for s in range(len(tweet_right)):
+        for e in range(s, len(tweet_right)):
+            part_tweet_right = tweet_right[s:e]
+            if part_tweet_right in TsutsujiDict and len(part_tweet_right)>=1:
+                ID_list.append(TsutsujiDict[part_tweet_right])
+                print part_tweet_right, TsutsujiDict[part_tweet_right]
     return ID_list
 def main():
     """
@@ -224,7 +234,7 @@ def main():
         f_mention = FeatureMention(tweet)
         f_window_list = FeatureWindow(tweet,"インフルエンザ")
         if args.modality:
-            f_tsutsuji_list = FeatureTsutsuji(f_window_list[3:], TsutsujiDict) #右のwindow 3つ
+            f_tsutsuji_list = FeatureTsutsuji(tweet,"インフル",TsutsujiDict) #右のwindow 3つ
         if len(f_window_list)==0:
             #print "line: %d invalid tweet data. label=%s tweet=%s" %(cnt,flag,tweet)
             continue
@@ -264,6 +274,7 @@ def main():
         args.model_file.write("\n")
 
         print "\r%f" %(float(cnt)/10935),
+        print cnt,
     print "finish!"
     print "positive=%d, negative=%d, neutal=%d, total=%d" %(pos_cnt,neg_cnt,neu_cnt, cnt)
 if __name__=="__main__":
