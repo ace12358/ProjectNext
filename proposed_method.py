@@ -51,6 +51,36 @@ def getArgs():
         help="tsutsuji filename as tsutsuji data"
     )
 
+    parser.add_argument(
+        "-d", "--debug",
+        action='store_true',
+        default=False,
+        help="debug mode if this flag is set (default: False)"
+    )
+    parser.add_argument(
+        "-u", "--URL",
+        action='store_true',
+        default=False,
+        help="add feature: URL"
+    )
+    parser.add_argument(
+        "-a", "--atmark",
+        action='store_true',
+        default=False,
+        help="add feature: @*** tweet (mention tweet)"
+    )
+    parser.add_argument(
+        "-n", "--ngram",
+        action='store_true',
+        default=False,
+        help="add feature: ngram"
+    )
+    parser.add_argument(
+        "-m", "--modality",
+        action='store_true',
+        default=False,
+        help="add feature: modality if you this option, you use -t option and assign tsutsuji file"
+    )
     return parser.parse_args()
 
 def FeatureUrl(tweet):
@@ -139,8 +169,6 @@ def FeatureNgram(tweet, word, window=4):
         #wordがないものがあるのでその場合はNoneを返す
         return None
 
-
-
 def FeatureTsutsuji(right_window, TsutsujiDict):
     """
     tweet中の機能表現にマッチするもののリストを返す
@@ -159,24 +187,24 @@ def main():
     classiasのモデルを作れるような形式でfileを作成
     """
     #つつじの辞書の読み込み
-    TsutsujiDict = dict()
-    for line in args.tsutsuji_file:
-        itemList = line.strip().split(",")
-        surface = itemList[0].decode("utf-8")
-        wordsenseID = itemList[3]
-        TsutsujiDict[surface] = wordsenseID
+    if args.modality:
+        TsutsujiDict = dict()
+        for line in args.tsutsuji_file:
+            itemList = line.strip().split(",")
+            surface = itemList[0].decode("utf-8")
+            wordsenseID = itemList[3]
+            TsutsujiDict[surface] = wordsenseID
     #for count line
     #lines = args.train_file.readlines()
     #counter
-    cnt = 1 #tweet index
+    cnt = 0 #tweet index
     pos_cnt = 0
     neg_cnt = 0
     neu_cnt = 0
     
     #file reading
     for line in args.train_file:
-	print "\r%f" %(float(cnt)/100)
-	cnt += 1
+        cnt += 1
         itemList = line.strip().split('\t')
         flag = itemList[0] #0 or 1
         if flag == "?":
@@ -195,7 +223,8 @@ def main():
         f_url = FeatureUrl(tweet)
         f_mention = FeatureMention(tweet)
         f_window_list = FeatureWindow(tweet,"インフルエンザ")
-        f_tsutsuji_list = FeatureTsutsuji(f_window_list[3:], TsutsujiDict) #右のwindow 3つ
+        if args.modality:
+            f_tsutsuji_list = FeatureTsutsuji(f_window_list[3:], TsutsujiDict) #右のwindow 3つ
         if len(f_window_list)==0:
             #print "line: %d invalid tweet data. label=%s tweet=%s" %(cnt,flag,tweet)
             continue
@@ -205,9 +234,15 @@ def main():
             if f_ngram == None: #インフルが入っていないtweet
                 continue
         args.model_file.write("# %s\n" %tweet)
-        args.model_file.write("%s " %flag) 
-        #args.model_file.write("url=%d " %f_url)
-        #args.model_file.write("mentoin=%d " %f_mention)
+        args.model_file.write("%s " %flag)
+        if args.URL: 
+            args.model_file.write("url=%d " %f_url)
+        if args.atmark:
+            args.model_file.write("mentoin=%d " %f_mention)
+        if args.ngram:
+            for i in range(len(f_ngram)/2):
+                args.model_file.write("f_ngram_l=%s " %f_ngram.split("|")[0][0:0+i+1].encode("utf-8"))
+                args.model_file.write("f_ngram_r=%s " %f_ngram.split("|")[1][0:0+i+1].encode("utf-8"))
         """
         for i in range(len(f_ngram)/2):
         #    print i
@@ -222,13 +257,15 @@ def main():
         args.model_file.write("%s " %f_window_list[4])
         args.model_file.write("%s " %f_window_list[5])
         ####つつじの意味ID素性を作成
-        for f_tsutsuji in f_tsutsuji_list:
-            args.model_file.write("f_tsutsuji_ID=%s " %f_tsutsuji)
+        if args.modality:
+            for f_tsutsuji in f_tsutsuji_list:
+                args.model_file.write("f_tsutsuji_ID=%s " %f_tsutsuji)
 
         args.model_file.write("\n")
 
+        print "\r%f" %(float(cnt)/10935),
     print "finish!"
-    print "positive=%d, negative=%d, neutal=%d" %(pos_cnt,neg_cnt,neu_cnt)
+    print "positive=%d, negative=%d, neutal=%d, total=%d" %(pos_cnt,neg_cnt,neu_cnt, cnt)
 if __name__=="__main__":
     args=getArgs()
     main()
