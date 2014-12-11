@@ -179,7 +179,6 @@ def FeatureTsutsuji(tweet, word, TsutsujiDict):
     tweet = tweet.decode("utf-8")
     re_word = re.compile(word.decode("utf-8"))
     if re_word.search(tweet) == None:
-        print "%s is not in tweet"
         return ID_list
     re_word_end_index = re_word.search(tweet).end()
     tweet_right = tweet[re_word_end_index:re_word_end_index+15]
@@ -188,8 +187,9 @@ def FeatureTsutsuji(tweet, word, TsutsujiDict):
         for e in range(s, len(tweet_right)):
             part_tweet_right = tweet_right[s:e]
             if part_tweet_right in TsutsujiDict and len(part_tweet_right)>=1:
-                ID_list.append(TsutsujiDict[part_tweet_right])
-                print part_tweet_right, TsutsujiDict[part_tweet_right]
+                ID_list.append(TsutsujiDict[part_tweet_right][0:2])
+                if len(ID_list)>=5: # 5 is best (I don't know why this is best)
+                    return ID_list
     return ID_list
 def main():
     """
@@ -223,9 +223,11 @@ def main():
         elif flag == "0":
             neg_cnt += 1
             flag = "-1"
-        else:
+        elif flag == "1" or flag == "+1":
             pos_cnt += 1
-
+        else:
+            print "invalid flag in line %d" %cnt
+            continue
         data = itemList[1] #data
         tweet = itemList[3] #tweet
 
