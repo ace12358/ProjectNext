@@ -343,6 +343,8 @@ def main():
         f_mention = FeatureMention(tweet)
         f_window_list = FeatureWindow(tweet,target_word)
         f_data = data.split('/')[1]
+        if cnt >= 9173:
+            f_data = data.split('/')[0]
         if args.modality:
             f_tsutsuji_list = FeatureTsutsuji(tweet,target_word,TsutsujiDict) #右のwindow 3つ
         f_ngram = FeatureNgram(tweet, target_word)
