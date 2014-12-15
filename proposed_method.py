@@ -21,7 +21,7 @@ import re
 import argparse
 import csv
 import string
-
+from collections import defaultdict
 def getArgs():
     """
     optional argument setting
@@ -50,12 +50,11 @@ def getArgs():
         default=sys.stdout,
         help="tsutsuji filename as tsutsuji data"
     )
-
     parser.add_argument(
-        "-d", "--debug",
+        "-d", "--data",
         action='store_true',
         default=False,
-        help="debug mode if this flag is set (default: False)"
+        help="add feature: data(e.g. manth)"
     )
     parser.add_argument(
         "-u", "--URL",
@@ -80,6 +79,19 @@ def getArgs():
         action='store_true',
         default=False,
         help="add feature: modality if you this option, you use -t option and assign tsutsuji file"
+    )
+    parser.add_argument(
+        "-e", "--extent_modality",
+        action='store_true',
+        default=False,
+        help="add feature: extent modality such as zunda if you this option, you use -z option and assign tsutsuji file"
+    )
+    parser.add_argument(
+        "-z", "--zunda",
+        dest="zunda_file",
+        type=argparse.FileType("r"),
+        default=sys.stdout,
+        help="zunda filename as zunda data"
     )
     return parser.parse_args()
 
@@ -123,7 +135,7 @@ def FeatureWindow(tweet, word, window=6):
     mecab_result = tagger.parse(tweet)
     mecab_result_list = mecab_result.strip().split()
     for i in range(len(mecab_result_list)):
-        if mecab_result_list[i]==word or mecab_result_list[i]=="インフル" or mecab_result_list[i]=="シュタインフルエンザ":
+        if word in mecab_result_list[i]:
             for j in range(window/2):
                 try:
                     l_window_list.append(mecab_result_list[i-(window/2)+j])
@@ -137,12 +149,79 @@ def FeatureWindow(tweet, word, window=6):
                     r_window_list.append("None")
             #print " ".join(r_window_list), "RIGHT"
     window_list = l_window_list + r_window_list
+    if not window_list: #window_list is empty. mecab divide word
+        for i in range(len(mecab_result_list)):
+            if word in mecab_result_list[i]+mecab_result_list[i+1]:
+                mecab_result_list[i]=mecab_result_list[i]+mecab_result_list[i+1]
+                mecab_result_list.pop(i+1)
+                break
+            elif word in mecab_result_list[i]+mecab_result_list[i+1]+mecab_result_list[i+2]:
+                mecab_result_list[i]=mecab_result_list[i]+mecab_result_list[i+1]+mecab_result_list[i+2]
+                mecab_result_list.pop(i+1)
+                mecab_result_list.pop(i+2)
+                break
+        for i in range(len(mecab_result_list)):
+            if word in mecab_result_list[i]:
+                for j in range(window/2):
+                    try:
+                        l_window_list.append(mecab_result_list[i-(window/2)+j])
+                    except(IndexError):
+                        l_window_list.append("None")
+                #print " ".join(l_window_list), "LEFT"
+                for j in range(window/2):
+                    try:
+                        r_window_list.append(mecab_result_list[i+1+j])
+                    except(IndexError):
+                        r_window_list.append("None")
+                #print " ".join(r_window_list), "RIGHT"
+        window_list = l_window_list + r_window_list
+     
     return window_list
+def FeatureZunda(tweet, word, index,zunda_feature_dict):
+    """
+    wordのあとのzunda素性を抜き出す関数
+    入力:tweet,word,index,zunda_feature_candidate
+    出力:zunda_feature_list
+    """
+    zunda_feature_list=list()
+    zunda_feature_candidate_dict=zunda_feature_dict[str(index)]
+    tagger = MeCab.Tagger('-Owakati')
+    mecab_result = tagger.parse(tweet)
+    mecab_result_list = mecab_result.strip().split()
+    word_flag = False
+    for i in range(len(mecab_result_list)):
+        if word in mecab_result_list[i]:
+            word_flag=True
+        elif word_flag:
+            if mecab_result_list[i] in zunda_feature_candidate_dict:
+                zunda_feature_list.append("%s=%s" %(mecab_result_list[i], zunda_feature_candidate_dict[mecab_result_list[i]]))
+                break
+ 
+    if not word_flag:
+        for i in range(len(mecab_result_list)):
+            if word in mecab_result_list[i]+mecab_result_list[i+1]:
+                mecab_result_list[i]=mecab_result_list[i]+mecab_result_list[i+1]
+                mecab_result_list.pop(i+1)
+                break
+            elif word in mecab_result_list[i]+mecab_result_list[i+1]+mecab_result_list[i+2]:
+                mecab_result_list[i]=mecab_result_list[i]+mecab_result_list[i+1]+mecab_result_list[i+2]
+                mecab_result_list.pop(i+1)
+                mecab_result_list.pop(i+2)
+                break
+        for i in range(len(mecab_result_list)):
+            if word in mecab_result_list[i]:
+                word_flag=True
+            elif word_flag:
+                if mecab_result_list[i] in zunda_feature_candidate_dict:
+                    zunda_feature_list.append("%s=%s" %(mecab_result_list[i], zunda_feature_candidate_dict[mecab_result_list[i]]))
+                    break
+    return zunda_feature_list
+
 
 def FeatureNgram(tweet, word, window=4):
     """
     wordを中心とする文字ngramを抜き出す関数
-    ngramのnのデフォルトは4
+    ngramのnのデフォルトは
     入力:tweet
     出力:文字ngram
     """
@@ -204,6 +283,16 @@ def main():
             surface = itemList[0].decode("utf-8")
             wordsenseID = itemList[3]
             TsutsujiDict[surface] = wordsenseID
+    if args.extent_modality:
+        zunda_feature_dict = defaultdict(lambda:dict())
+        for line in args.zunda_file:
+            item_list=line.strip().split()
+            index = item_list[0]
+            feature = item_list[1]
+            key = feature.split('=')[0]
+            flag = feature.split('=')[1]
+            zunda_feature_dict[index][key]=flag
+        
     #for count line
     #lines = args.train_file.readlines()
     #counter
@@ -211,12 +300,32 @@ def main():
     pos_cnt = 0
     neg_cnt = 0
     neu_cnt = 0
+    invalid_data_cnt = 0
     
     #file reading
     for line in args.train_file:
         cnt += 1
         itemList = line.strip().split('\t')
         flag = itemList[0] #0 or 1
+        data = itemList[1] #data
+        tweet = itemList[3] #tweet
+
+        if "インフルエンザ" not in tweet \
+            and "インフル" not in tweet \
+            and "ｲﾝﾌﾙｴﾝｻﾞ" not in tweet \
+            and "ｲﾝﾌﾙ" not in tweet:
+            invalid_data_cnt += 1
+            continue
+        target_word = str()
+        if "インフルエンザ" in tweet:
+            target_word = "インフルエンザ"
+        elif "インフル" in tweet:
+            target_word = "インフル"
+        elif "ｲﾝﾌﾙｴﾝｻﾞ" in tweet:
+            target_word = "ｲﾝﾌﾙｴﾝｻﾞ"
+        elif "ｲﾝﾌﾙ" in tweet:
+            target_word = "ｲﾝﾌﾙ"
+
         if flag == "?":
             neu_cnt += 1
             continue
@@ -227,26 +336,29 @@ def main():
             pos_cnt += 1
         else:
             print "invalid flag in line %d" %cnt
+            invalid_data_cnt += 1
             continue
-        data = itemList[1] #data
-        tweet = itemList[3] #tweet
-
         # feature extraction
         f_url = FeatureUrl(tweet)
         f_mention = FeatureMention(tweet)
-        f_window_list = FeatureWindow(tweet,"インフルエンザ")
+        f_window_list = FeatureWindow(tweet,target_word)
+        f_data = data.split('/')[1]
         if args.modality:
-            f_tsutsuji_list = FeatureTsutsuji(tweet,"インフル",TsutsujiDict) #右のwindow 3つ
-        if len(f_window_list)==0:
-            #print "line: %d invalid tweet data. label=%s tweet=%s" %(cnt,flag,tweet)
-            continue
-        f_ngram = FeatureNgram(tweet, "インフルエンザ")
-        if f_ngram == None: #インフルエンザが入っていないtweet
-            f_ngram = FeatureNgram(tweet, "インフル")
-            if f_ngram == None: #インフルが入っていないtweet
-                continue
+            f_tsutsuji_list = FeatureTsutsuji(tweet,target_word,TsutsujiDict) #右のwindow 3つ
+        f_ngram = FeatureNgram(tweet, target_word)
+        if args.extent_modality:
+            f_zunda_list = FeatureZunda(tweet,target_word,cnt,zunda_feature_dict)
+        ####comment for classias
         args.model_file.write("# %s\n" %tweet)
         args.model_file.write("%s " %flag)
+
+        ####feature write
+        #add feature: windowBOW
+        #print target_word
+        for f_window in f_window_list:
+            args.model_file.write("%s " %f_window)
+        if args.data:
+            args.model_file.write("%s " %f_data)
         if args.URL: 
             args.model_file.write("url=%d " %f_url)
         if args.atmark:
@@ -255,30 +367,21 @@ def main():
             for i in range(len(f_ngram)/2):
                 args.model_file.write("f_ngram_l=%s " %f_ngram.split("|")[0][0:0+i+1].encode("utf-8"))
                 args.model_file.write("f_ngram_r=%s " %f_ngram.split("|")[1][0:0+i+1].encode("utf-8"))
-        """
-        for i in range(len(f_ngram)/2):
-        #    print i
-            args.model_file.write("f_ngram_l=%s " %f_ngram.split("|")[0][0:0+i+1].encode("utf-8"))
-            args.model_file.write("f_ngram_r=%s " %f_ngram.split("|")[1][0:0+i+1].encode("utf-8"))
-        """
-        #add feature: windowBOW
-        args.model_file.write("%s " %f_window_list[0])
-        args.model_file.write("%s " %f_window_list[1])
-        args.model_file.write("%s " %f_window_list[2])
-        args.model_file.write("%s " %f_window_list[3])
-        args.model_file.write("%s " %f_window_list[4])
-        args.model_file.write("%s " %f_window_list[5])
         ####つつじの意味ID素性を作成
         if args.modality:
             for f_tsutsuji in f_tsutsuji_list:
                 args.model_file.write("f_tsutsuji_ID=%s " %f_tsutsuji)
+        ####zudna feature add
+        if args.extent_modality:
+            for f_zunda in f_zunda_list:
+                args.model_file.write("%s " %f_zunda)
 
         args.model_file.write("\n")
 
-        print "\r%f" %(float(cnt)/10935),
-        print cnt,
+        #print "\r%f" %(float(cnt)/10935),
+        print "\r%d" %cnt,
     print "finish!"
-    print "positive=%d, negative=%d, neutal=%d, total=%d" %(pos_cnt,neg_cnt,neu_cnt, cnt)
+    print "positive=%d, negative=%d, neutal=%d,invalid_data=%d total=%d" %(pos_cnt,neg_cnt,neu_cnt,invalid_data_cnt, cnt)
 if __name__=="__main__":
     args=getArgs()
     main()
