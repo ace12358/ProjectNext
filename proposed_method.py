@@ -266,7 +266,7 @@ def FeatureTsutsuji(tweet, word, TsutsujiDict):
         for e in range(s, len(tweet_right)):
             part_tweet_right = tweet_right[s:e]
             if part_tweet_right in TsutsujiDict and len(part_tweet_right)>=1:
-                ID_list.append(TsutsujiDict[part_tweet_right][0:2])
+                ID_list.append(TsutsujiDict[part_tweet_right][0:])
                 if len(ID_list)>=5: # 5 is best (I don't know why this is best)
                     return ID_list
     return ID_list
@@ -345,6 +345,10 @@ def main():
         f_data = data.split('/')[1]
         if cnt >= 9173:
             f_data = data.split('/')[0]
+        if f_data=="12" or f_data=="1" or f_data=="2" or f_data=="01" or f_data=="02":
+            f_data="data=on_season"
+        else:
+            f_data="data=not_on_season"
         if args.modality:
             f_tsutsuji_list = FeatureTsutsuji(tweet,target_word,TsutsujiDict) #右のwindow 3つ
         f_ngram = FeatureNgram(tweet, target_word)
